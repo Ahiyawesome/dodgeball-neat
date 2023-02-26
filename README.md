@@ -13,4 +13,4 @@ To test the population against yourself, uncomment "test_ai" at the bottom of th
 To train the population against the best genome (which I put as V2), uncomment "special_training" at the bottom of the same file
 
 # Hitman V2 neural network
-![Alt text](C:/Users/ahiya/PYTHON%20PROJECTS/PycharmProjects/NEAThitman/Digraph.gv.svg)
+![Alt text](Neural_Net.png)
