@@ -3,8 +3,8 @@ import pickle
 import pygame as pg
 import neat
 import visualize
-from shooter import Shooter
-from bullet import Bullet
+from playerAI import Player
+from ball import Ball
 
 pg.init()
 
@@ -21,13 +21,13 @@ MAX_BULLETS = 1
 NUMBER_OF_PLAYERS = 2
 FONT = pg.font.Font('freesansbold.ttf', 20)
 
-shooter1 = Shooter(100, HEIGHT // 2, 30, 20, speed=7, color=GREEN)
-shooter2 = Shooter(900, HEIGHT // 2, 30, 20, speed=7, color=BLUE)
+player1 = Player(100, HEIGHT // 2, 30, 20, speed=7, color=GREEN)
+player2 = Player(900, HEIGHT // 2, 30, 20, speed=7, color=BLUE)
 
-shooters = [shooter1, shooter2]
-ammoCounts = [MAX_BULLETS, MAX_BULLETS]
+players = [player1, player2]
+stockCounts = [MAX_BULLETS, MAX_BULLETS]
 cd = [0, 0]
-bullets = [[], []]
+balls = [[], []]
 hits = [0, 0]
 
 
@@ -37,24 +37,24 @@ def manage_cd(cds):
             cds[i] += 1
 
 
-def ai_movement(shooters, bullets, nets):
+def ai_movement(players, balls, nets):
     for i, net in enumerate(nets):
         other_i = abs(i - 1)
 
-        try:
-            get_output = net.activate((shooters[i].y / 100, abs(shooters[i].x - bullets[other_i][0].x) / 100,
-                                       abs(shooters[i].y - bullets[other_i][0].y) / 100,
-                                       (shooters[i].y - shooters[other_i].y) / 100))
-        except IndexError:  # if no bullets in field
-            get_output = net.activate((shooters[i].y / 100, 0, 0, abs(shooters[i].y - shooters[other_i].y) / 100))
+        # try:
+        #     get_output = net.activate((players[i].y / 100, abs(players[i].x - balls[other_i][0].x) / 100,
+        #                                abs(players[i].y - balls[other_i][0].y) / 100,
+        #                                (players[i].y - players[other_i].y) / 100))
+        # except IndexError:  # if no balls in field
+        #     get_output = net.activate((players[i].y / 100, 0, 0, abs(players[i].y - players[other_i].y) / 100))
 
-        # try:          #THE OLD INPUTS, FOR V2
-        #     get_output = net.activate((shooters[i].y, shooters[other_i].y, abs(shooters[i].x - bullets[other_i][0].x), abs(shooters[i].y - shooters[other_i].y)))
-        # except IndexError:      # if no bullets
-        #     get_output = net.activate((shooters[i].y, shooters[other_i].y, 0, abs(shooters[i].y - shooters[other_i].y)))
+        try:          #THE OLD INPUTS, FOR V2
+            get_output = net.activate((players[i].y, players[other_i].y, abs(players[i].x - balls[other_i][0].x), abs(players[i].y - players[other_i].y)))
+        except IndexError:      # if no balls
+            get_output = net.activate((players[i].y, players[other_i].y, 0, abs(players[i].y - players[other_i].y)))
 
         state = get_output.index(max(get_output))
-        shooters[i].what_to_do(state)
+        players[i].what_to_do(state)
 
 
 def player_movement(s1):
@@ -68,37 +68,37 @@ def player_movement(s1):
         s1.what_to_do(2)
 
 
-def shoot(shooter, index, bullets):
-    if shooter.color == GREEN:
+def throw(player, index, balls):
+    if player.color == GREEN:
         speed = 25
     else:
         speed = -25
-    new_bullet = Bullet(shooter.x, shooter.y + (shooter.height // 2), 10, 5, speed, RED)
-    bullets[index].append(new_bullet)
+    new_ball = Ball(player.x, player.y + (player.height // 2), 10, 5, speed, RED)
+    balls[index].append(new_ball)
 
 
-def handle_collision(bullets, ammo, shooters, hits):
-    for i, bullet_group in enumerate(bullets):
-        for j, bullet in enumerate(bullet_group):
-            if bullet.x + bullet.width < 0 or bullet.x > WIDTH or bullet.y + bullet.height > HEIGHT or bullet.y < 0:
-                bullets[i].pop(j)
-                ammo[i] += 1
+def handle_collision(balls, stock, players, hits):
+    for i, ball_group in enumerate(balls):
+        for j, ball in enumerate(ball_group):
+            if ball.x + ball.width < 0 or ball.x > WIDTH or ball.y + ball.height > HEIGHT or ball.y < 0:
+                balls[i].pop(j)
+                stock[i] += 1
             new_i = abs(i - 1)
-            if bullet.x + bullet.width > shooters[new_i].x and bullet.x < shooters[new_i].x + shooters[
-                new_i].width and bullet.y + bullet.height > shooters[new_i].y and bullet.y < shooters[new_i].y + \
-                    shooters[new_i].height:
-                bullets[i].pop(j)
+            if ball.x + ball.width > players[new_i].x and ball.x < players[new_i].x + players[
+                new_i].width and ball.y + ball.height > players[new_i].y and ball.y < players[new_i].y + \
+                    players[new_i].height:
+                balls[i].pop(j)
                 hits[i] += 10
-                ammo[i] += 1
+                stock[i] += 1
 
-    for i, shooter in enumerate(shooters):
-        if shooter.y + shooter.height >= HEIGHT:
-            shooter.y = HEIGHT - shooter.height
-        if shooter.y <= 0:
-            shooter.y = 0
+    for i, player in enumerate(players):
+        if player.y + player.height >= HEIGHT:
+            player.y = HEIGHT - player.height
+        if player.y <= 0:
+            player.y = 0
 
 
-def draw(win, shooters, bullets, score_texts, id_texts):
+def draw(win, players, balls, score_texts, id_texts):
     win.fill(BLACK)
     for text_group in score_texts:
         win.blit(text_group[0], text_group[1])
@@ -107,27 +107,27 @@ def draw(win, shooters, bullets, score_texts, id_texts):
             win.blit(id_text_group[0], id_text_group[1])
     except TypeError:
         pass
-    for shooter in shooters:
-        shooter.draw(win)
-    for bullet_group in bullets:
-        for bullet in bullet_group:
-            bullet.draw(win)
+    for player in players:
+        player.draw(win)
+    for ball_group in balls:
+        for ball in ball_group:
+            ball.draw(win)
     pg.display.update()
 
 
-def reset(hits, shooters, bullets, ammo):
+def reset(hits, players, balls, stock):
     for i in range(NUMBER_OF_PLAYERS):
         hits[i] = 0
-        ammoCounts[i] = 1
+        stockCounts[i] = 1
 
-    for shooter in shooters:
-        shooter.x = shooter.orX
-        shooter.y = shooter.orY
+    for player in players:
+        player.x = player.orX
+        player.y = player.orY
 
-    for i, bullet_group in enumerate(bullets):
-        for j, bullet in enumerate(bullet_group):
-            if bullets[i][j]:
-                bullets[i].pop(j)
+    for i, ball_group in enumerate(balls):
+        for j, ball in enumerate(ball_group):
+            if balls[i][j]:
+                balls[i].pop(j)
 
 
 def start_training(config, genomes, genome_ids):
@@ -142,21 +142,21 @@ def start_training(config, genomes, genome_ids):
 
         manage_cd(cd)
 
-        ai_movement(shooters, bullets, nets)
+        ai_movement(players, balls, nets)
 
-        for i, shooter in enumerate(shooters):
-            if shooter.shoot:
-                if ammoCounts[i] > 0 and cd[i] >= 30:
-                    shoot(shooter, i, bullets)
-                    ammoCounts[i] -= 1
+        for i, player in enumerate(players):
+            if player.throw:
+                if stockCounts[i] > 0 and cd[i] >= 30:
+                    throw(player, i, balls)
+                    stockCounts[i] -= 1
                     cd[i] = 0
-                shooter.shoot = False
+                player.throw = False
 
-        for bullet_group in bullets:
-            for bullet in bullet_group:
-                bullet.move()
+        for ball_group in balls:
+            for ball in ball_group:
+                ball.move()
 
-        handle_collision(bullets, ammoCounts, shooters, hits)
+        handle_collision(balls, stockCounts, players, hits)
 
         score1 = FONT.render(hits[0].__str__(), True, WHITE)
         score2 = FONT.render(hits[1].__str__(), True, WHITE)
@@ -168,13 +168,13 @@ def start_training(config, genomes, genome_ids):
         id2Rect = id2.get_rect()
         score1Rect.center = (WIDTH // 2 - 100, 50)
         score2Rect.center = (WIDTH // 2 + 100, 50)
-        id1Rect.center = (shooters[0].x, 50)
-        id2Rect.center = (shooters[1].x, 50)
+        id1Rect.center = (players[0].x, 50)
+        id2Rect.center = (players[1].x, 50)
 
         score_texts = [[score1, score1Rect], [score2, score2Rect]]
         id_texts = [[id1, id1Rect], [id2, id2Rect]]
 
-        draw(WIN, shooters, bullets, score_texts, id_texts)
+        draw(WIN, players, balls, score_texts, id_texts)
 
         count += 1
 
@@ -183,7 +183,7 @@ def start_training(config, genomes, genome_ids):
                 genome.fitness += hits[i]
                 genome.fitness -= hits[abs(i-1)]  # Trying not to trade hits
 
-            reset(hits, shooters, bullets, ammoCounts)
+            reset(hits, players, balls, stockCounts)
             break
 
         for event in pg.event.get():
@@ -191,8 +191,8 @@ def start_training(config, genomes, genome_ids):
                 pg.quit()
 
 
-def tester(config, hitman):
-    net = neat.nn.FeedForwardNetwork.create(hitman, config)
+def tester(config, player):
+    net = neat.nn.FeedForwardNetwork.create(player, config)
 
     run = True
     first = True
@@ -203,35 +203,35 @@ def tester(config, hitman):
         manage_cd(cd)
 
         try:
-            get_output = ((shooters[0].y / 100, abs(shooters[0].x - bullets[1][0].x) / 100,
-                           abs(shooters[0].y - bullets[1][0].y) / 100,
-                           (shooters[0].y - shooters[1].y) / 100))
+            get_output = ((players[0].y / 100, abs(players[0].x - balls[1][0].x) / 100,
+                           abs(players[0].y - balls[1][0].y) / 100,
+                           (players[0].y - players[1].y) / 100))
         except IndexError:
             get_output = net.activate(
-                (shooters[0].y / 100, 0, 0, abs(shooters[0].y - shooters[1].y) / 100))
+                (players[0].y / 100, 0, 0, abs(players[0].y - players[1].y) / 100))
 
         if first:
             print(get_output)
             first = False
 
         state = get_output.index(max(get_output))
-        shooters[0].what_to_do(state)
+        players[0].what_to_do(state)
 
-        player_movement(shooters[1])
+        player_movement(players[1])
 
-        for i, shooter in enumerate(shooters):
-            if shooter.shoot:
-                if ammoCounts[i] > 0 and cd[i] >= 30:
-                    shoot(shooter, i, bullets)
-                    ammoCounts[i] -= 1
+        for i, player in enumerate(players):
+            if player.throw:
+                if stockCounts[i] > 0 and cd[i] >= 30:
+                    throw(player, i, balls)
+                    stockCounts[i] -= 1
                     cd[i] = 0
-                shooter.shoot = False
+                player.throw = False
 
-        for bullet_group in bullets:
-            for bullet in bullet_group:
-                bullet.move()
+        for ball_group in balls:
+            for ball in ball_group:
+                ball.move()
 
-        handle_collision(bullets, ammoCounts, shooters, hits)
+        handle_collision(balls, stockCounts, players, hits)
 
         score1 = FONT.render(hits[0].__str__(), True, WHITE)
         score2 = FONT.render(hits[1].__str__(), True, WHITE)
@@ -243,9 +243,9 @@ def tester(config, hitman):
 
         keys = pg.key.get_pressed()
         if keys[pg.K_r]:
-            reset(hits,  shooters, bullets, ammoCounts)
+            reset(hits,  players, balls, stockCounts)
 
-        draw(WIN, shooters, bullets, score_texts, None)
+        draw(WIN, players, balls, score_texts, None)
 
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -292,28 +292,28 @@ def train_ai(config):
 
     best_one = p.run(eval_genomes, 15)
 
-    with open("hitmanV5.pickle", "wb") as f:
+    with open("playerV5.pickle", "wb") as f:
         pickle.dump(best_one, f)
 
 
 def test_ai(config):
-    # with open("hitman.pickle", "rb") as f:            # HITMAN 1 Tactic - Hug the ground, spam if enemy comes near
-    #     hitman = pickle.load(f)
+    # with open("player.pickle", "rb") as f:            # HITMAN 1 Tactic - Hug the ground, spam if enemy comes near
+    #     player = pickle.load(f)
 
-    # with open("hitmanV2.pickle", "rb") as f:         # HITMAN 2 Tactic - Actually is pro
-    #     hitman = pickle.load(f)
+    with open("playerV2.pickle", "rb") as f:         # HITMAN 2 Tactic - Actually is pro
+        player = pickle.load(f)
 
-    # with open("hitmanV3.pickle", "rb") as f:      # HITMAN 3 Tactic - Hug the top, spam (dumb again)
-    #     hitman = pickle.load(f)
+    # with open("playerV3.pickle", "rb") as f:      # HITMAN 3 Tactic - Hug the top, spam (dumb again)
+    #     player = pickle.load(f)
 
-    # with open("hitmanV4.pickle", "rb") as f:       # HITMAN 4 - kinda weird (trained in pop of 1500, not worth)
-    #     hitman = pickle.load(f)
+    # with open("playerV4.pickle", "rb") as f:       # HITMAN 4 - kinda weird (trained in pop of 1500, not worth)
+    #     player = pickle.load(f)
 
-    with open("hitmanV5.pickle", "rb") as f:       # HITMAN 5
-        hitman = pickle.load(f)
+    # with open("playerV5.pickle", "rb") as f:       # HITMAN 5
+    #     player = pickle.load(f)
 
-    visualize.draw_net(config, hitman)
-    tester(config, hitman)
+    visualize.draw_net(config, player)
+    tester(config, player)
 
 
 if __name__ == '__main__':
